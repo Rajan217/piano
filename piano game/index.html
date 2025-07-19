@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Game</title>
+    <!-- Tone.js for audio synthesis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: 'Inter', sans-serif; /* Use Inter font */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(to right, #4facfe, #00f2fe); /* Vibrant background */
+            color: #ecf0f1;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+            color: #fff;
+        }
+
+        .piano {
+            display: flex;
+            position: relative;
+            background-color: #333; /* Dark base for the piano */
+            border-radius: 15px;
+            padding: 15px; /* Reduced padding slightly for more space */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5), 0 5px 10px rgba(0, 0, 0, 0.3);
+            flex-wrap: nowrap; /* Prevent wrapping of keys */
+            overflow-x: hidden; /* Crucial: No horizontal scrolling */
+            width: 100%; /* Take full available width */
+            max-width: 1000px; /* Limit max width for very large screens */
+        }
+
+        .key {
+            width: 43px; /* Adjusted width for white keys to fit all on screen */
+            height: 250px;
+            border: 1px solid #333;
+            border-radius: 0 0 8px 8px;
+            box-sizing: border-box;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.1s ease, transform 0.05s ease;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Position key label at the bottom */
+            padding-bottom: 10px;
+            font-weight: bold;
+            user-select: none; /* Prevent text selection */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+            flex-shrink: 0; /* Prevent keys from shrinking too much */
+        }
+
+        .white-key {
+            background-color: #f0f0f0;
+            margin-right: 1px; /* Reduced gap between white keys */
+            z-index: 1;
+            color: #333;
+        }
+
+        .white-key:active, .white-key.active {
+            background-color: #ccc;
+            transform: translateY(2px);
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .black-key {
+            background-color: #222;
+            width: 25px; /* Adjusted narrower width for black keys */
+            height: 150px; /* Shorter height for black keys */
+            margin-left: -13.5px; /* Overlap with previous white key (25/2 + 1px margin) */
+            margin-right: -13.5px; /* Overlap with next white key */
+            z-index: 2; /* Place black keys on top of white keys */
+            border-color: #111;
+            color: #eee;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .black-key:active, .black-key.active {
+            background-color: #000;
+            transform: translateY(2px);
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        /* General positioning for black keys based on white key index */
+        /* Formula: (white_key_index * white_key_width) + piano_padding + (white_key_width / 2) - (black_key_width / 2) - white_key_margin_right */
+        /* Default: (idx * 43px) + 15px + 21.5px - 12.5px - 1px = (idx * 43px) + 23px */
+        .key[data-note="C#3"] { left: calc(43px * 0 + 23px); top: 15px; }
+        .key[data-note="D#3"] { left: calc(43px * 1 + 23px); top: 15px; }
+        .key[data-note="F#3"] { left: calc(43px * 3 + 23px); top: 15px; }
+        .key[data-note="G#3"] { left: calc(43px * 4 + 23px); top: 15px; }
+        .key[data-note="A#3"] { left: calc(43px * 5 + 23px); top: 15px; }
+
+        .key[data-note="C#4"] { left: calc(43px * 7 + 23px); top: 15px; }
+        .key[data-note="D#4"] { left: calc(43px * 8 + 23px); top: 15px; }
+        .key[data-note="F#4"] { left: calc(43px * 10 + 23px); top: 15px; }
+        .key[data-note="G#4"] { left: calc(43px * 11 + 23px); top: 15px; }
+        .key[data-note="A#4"] { left: calc(43px * 12 + 23px); top: 15px; }
+
+        .key[data-note="C#5"] { left: calc(43px * 14 + 23px); top: 15px; }
+        .key[data-note="D#5"] { left: calc(43px * 15 + 23px); top: 15px; }
+        .key[data-note="F#5"] { left: calc(43px * 17 + 23px); top: 15px; }
+        .key[data-note="G#5"] { left: calc(43px * 18 + 23px); top: 15px; }
+        .key[data-note="A#5"] { left: calc(43px * 19 + 23px); top: 15px; }
+
+
+        .key-label {
+            position: absolute;
+            bottom: 10px;
+            font-size: 0.8em;
+            text-align: center;
+            width: 100%;
+        }
+
+        .instructions {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+            text-align: center;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .instructions p {
+            margin: 5px 0;
+        }
+        .instructions strong {
+            color: #f1c40f;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+                margin-bottom: 20px;
+            }
+            .piano {
+                padding: 10px; /* Adjusted padding */
+                border-radius: 10px;
+                width: 100%; /* Take full available width */
+            }
+            .key {
+                width: 35px; /* Adjusted width for white keys */
+                height: 200px;
+            }
+            .black-key {
+                width: 20px; /* Adjusted narrower width for black keys */
+                height: 120px;
+                margin-left: -10.5px; /* Overlap with previous white key (20/2 + 1px margin) */
+                margin-right: -10.5px; /* Overlap with next white key */
+            }
+            /* Adjusting positions based on the white key sequence for smaller screens */
+            /* Formula: (idx * 35px) + 10px + 17.5px - 10px - 1px = (idx * 35px) + 16.5px */
+            .key[data-note="C#3"] { left: calc(35px * 0 + 16.5px); top: 10px; }
+            .key[data-note="D#3"] { left: calc(35px * 1 + 16.5px); top: 10px; }
+            .key[data-note="F#3"] { left: calc(35px * 3 + 16.5px); top: 10px; }
+            .key[data-note="G#3"] { left: calc(35px * 4 + 16.5px); top: 10px; }
+            .key[data-note="A#3"] { left: calc(35px * 5 + 16.5px); top: 10px; }
+
+            .key[data-note="C#4"] { left: calc(35px * 7 + 16.5px); top: 10px; }
+            .key[data-note="D#4"] { left: calc(35px * 8 + 16.5px); top: 10px; }
+            .key[data-note="F#4"] { left: calc(35px * 10 + 16.5px); top: 10px; }
+            .key[data-note="G#4"] { left: calc(35px * 11 + 16.5px); top: 10px; }
+            .key[data-note="A#4"] { left: calc(35px * 12 + 16.5px); top: 10px; }
+
+            .key[data-note="C#5"] { left: calc(35px * 14 + 16.5px); top: 10px; }
+            .key[data-note="D#5"] { left: calc(35px * 15 + 16.5px); top: 10px; }
+            .key[data-note="F#5"] { left: calc(35px * 17 + 16.5px); top: 10px; }
+            .key[data-note="G#5"] { left: calc(35px * 18 + 16.5px); top: 10px; }
+            .key[data-note="A#5"] { left: calc(35px * 19 + 16.5px); top: 10px; }
+
+            .key-label {
+                font-size: 0.7em;
+                bottom: 5px;
+            }
+            .instructions {
+                padding: 10px 15px;
+                margin-top: 20px;
+                font-size: 0.9em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 2em;
+            }
+            .key {
+                width: 28px; /* Adjusted width for white keys */
+                height: 180px;
+            }
+            .black-key {
+                width: 16px; /* Adjusted narrower width for black keys */
+                height: 100px;
+                margin-left: -8.5px; /* Overlap with previous white key (16/2 + 1px margin) */
+                margin-right: -8.5px; /* Overlap with next white key */
+            }
+            /* Adjusting positions based on the white key sequence for very small screens */
+            /* Formula: (idx * 28px) + 10px + 14px - 8px - 1px = (idx * 28px) + 15px */
+            .key[data-note="C#3"] { left: calc(28px * 0 + 15px); top: 10px; }
+            .key[data-note="D#3"] { left: calc(28px * 1 + 15px); top: 10px; }
+            .key[data-note="F#3"] { left: calc(28px * 3 + 15px); top: 10px; }
+            .key[data-note="G#3"] { left: calc(28px * 4 + 15px); top: 10px; }
+            .key[data-note="A#3"] { left: calc(28px * 5 + 15px); top: 10px; }
+
+            .key[data-note="C#4"] { left: calc(28px * 7 + 15px); top: 10px; }
+            .key[data-note="D#4"] { left: calc(28px * 8 + 15px); top: 10px; }
+            .key[data-note="F#4"] { left: calc(28px * 10 + 15px); top: 10px; }
+            .key[data-note="G#4"] { left: calc(28px * 11 + 15px); top: 10px; }
+            .key[data-note="A#4"] { left: calc(28px * 12 + 15px); top: 10px; }
+
+            .key[data-note="C#5"] { left: calc(28px * 14 + 15px); top: 10px; }
+            .key[data-note="D#5"] { left: calc(28px * 15 + 15px); top: 10px; }
+            .key[data-note="F#5"] { left: calc(28px * 17 + 15px); top: 10px; }
+            .key[data-note="G#5"] { left: calc(28px * 18 + 15px); top: 10px; }
+            .key[data-note="A#5"] { left: calc(28px * 19 + 15px); top: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Play the Piano!</h1>
+
+    <div class="piano">
+        <!-- White Keys (C3 to C6) -->
+        <div class="key white-key" data-note="C3" data-key="z"><span class="key-label">Z (C3)</span></div>
+        <div class="key white-key" data-note="D3" data-key="x"><span class="key-label">X (D3)</span></div>
+        <div class="key white-key" data-note="E3" data-key="c"><span class="key-label">C (E3)</span></div>
+        <div class="key white-key" data-note="F3" data-key="v"><span class="key-label">V (F3)</span></div>
+        <div class="key white-key" data-note="G3" data-key="b"><span class="key-label">B (G3)</span></div>
+        <div class="key white-key" data-note="A3" data-key="n"><span class="key-label">N (A3)</span></div>
+        <div class="key white-key" data-note="B3" data-key="m"><span class="key-label">M (B3)</span></div>
+
+        <div class="key white-key" data-note="C4" data-key="a"><span class="key-label">A (C4)</span></div>
+        <div class="key white-key" data-note="D4" data-key="s"><span class="key-label">S (D4)</span></div>
+        <div class="key white-key" data-note="E4" data-key="d"><span class="key-label">D (E4)</span></div>
+        <div class="key white-key" data-note="F4" data-key="f"><span class="key-label">F (F4)</span></div>
+        <div class="key white-key" data-note="G4" data-key="g"><span class="key-label">G (G4)</span></div>
+        <div class="key white-key" data-note="A4" data-key="h"><span class="key-label">H (A4)</span></div>
+        <div class="key white-key" data-note="B4" data-key="j"><span class="key-label">J (B4)</span></div>
+
+        <div class="key white-key" data-note="C5" data-key="k"><span class="key-label">K (C5)</span></div>
+        <div class="key white-key" data-note="D5" data-key="l"><span class="key-label">L (D5)</span></div>
+        <div class="key white-key" data-note="E5" data-key=";"><span class="key-label">; (E5)</span></div>
+        <div class="key white-key" data-note="F5" data-key="'"><span class="key-label">' (F5)</span></div>
+        <div class="key white-key" data-note="G5" data-key="["><span class="key-label">[ (G5)</span></div>
+        <div class="key white-key" data-note="A5" data-key="]"><span class="key-label">] (A5)</span></div>
+        <div class="key white-key" data-note="B5" data-key="\"><span class="key-label">\ (B5)</span></div>
+        <div class="key white-key" data-note="C6" data-key="enter"><span class="key-label">Enter (C6)</span></div>
+
+
+        <!-- Black Keys (positioned absolutely) -->
+        <!-- C3 Octave -->
+        <div class="key black-key" data-note="C#3" data-key="sft-z"><span class="key-label">Shift+Z (C#3)</span></div>
+        <div class="key black-key" data-note="D#3" data-key="sft-x"><span class="key-label">Shift+X (D#3)</span></div>
+        <div class="key black-key" data-note="F#3" data-key="sft-v"><span class="key-label">Shift+V (F#3)</span></div>
+        <div class="key black-key" data-note="G#3" data-key="sft-b"><span class="key-label">Shift+B (G#3)</span></div>
+        <div class="key black-key" data-note="A#3" data-key="sft-n"><span class="key-label">Shift+N (A#3)</span></div>
+
+        <!-- C4 Octave -->
+        <div class="key black-key" data-note="C#4" data-key="w"><span class="key-label">W (C#4)</span></div>
+        <div class="key black-key" data-note="D#4" data-key="e"><span class="key-label">E (D#4)</span></div>
+        <div class="key black-key" data-note="F#4" data-key="t"><span class="key-label">T (F#4)</span></div>
+        <div class="key black-key" data-note="G#4" data-key="y"><span class="key-label">Y (G#4)</span></div>
+        <div class="key black-key" data-note="A#4" data-key="u"><span class="key-label">U (A#4)</span></div>
+
+        <!-- C5 Octave -->
+        <div class="key black-key" data-note="C#5" data-key="o"><span class="key-label">O (C#5)</span></div>
+        <div class="key black-key" data-note="D#5" data-key="p"><span class="key-label">P (D#5)</span></div>
+        <div class="key black-key" data-note="F#5" data-key="[sft-']"><span class="key-label">Shift+' (F#5)</span></div>
+        <div class="key black-key" data-note="G#5" data-key="{sft-[}"><span class="key-label">Shift+[ (G#5)</span></div>
+        <div class="key black-key" data-note="A#5" data-key="{sft-]}"><span class="key-label">Shift+] (A#5)</span></div>
+    </div>
+
+    <div class="instructions">
+        <p><strong>Instructions:</strong></p>
+        <p>Use your keyboard to play the piano:</p>
+        <p><strong>White Keys (Left to Right, Z to Enter):</strong></p>
+        <p><strong>Z (C3), X (D3), C (E3), V (F3), B (G3), N (A3), M (B3)</strong></p>
+        <p><strong>A (C4), S (D4), D (E4), F (F4), G (G4), H (A4), J (B4)</strong></p>
+        <p><strong>K (C5), L (D5), ; (E5), ' (F5), [ (G5), ] (A5), \ (B5), Enter (C6)</strong></p>
+        <p><strong>Black Keys (Corresponding to notes):</strong></p>
+        <p><strong>Shift+Z (C#3), Shift+X (D#3), Shift+V (F#3), Shift+B (G#3), Shift+N (A#3)</strong></p>
+        <p><strong>W (C#4), E (D#4), T (F#4), Y (G#4), U (A#4)</strong></p>
+        <p><strong>O (C#5), P (D#5), Shift+' (F#5), Shift+[ (G#5), Shift+] (A#5)</strong></p>
+        <p>You can also click or tap on the keys directly!</p>
+    </div>
+
+    <script>
+        // Initialize Tone.js Synth
+        const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: {
+                type: "sine"
+            },
+            envelope: {
+                attack: 0.005,
+                decay: 0.1,
+                sustain: 0.3,
+                release: 1
+            }
+        }).toDestination();
+
+        // Map keyboard keys to piano notes and their corresponding HTML elements
+        const keyMap = {
+            // C3 Octave
+            'z': { note: 'C3', element: document.querySelector('[data-key="z"]') },
+            'x': { note: 'D3', element: document.querySelector('[data-key="x"]') },
+            'c': { note: 'E3', element: document.querySelector('[data-key="c"]') },
+            'v': { note: 'F3', element: document.querySelector('[data-key="v"]') },
+            'b': { note: 'G3', element: document.querySelector('[data-key="b"]') },
+            'n': { note: 'A3', element: document.querySelector('[data-key="n"]') },
+            'm': { note: 'B3', element: document.querySelector('[data-key="m"]') },
+
+            // C4 Octave
+            'a': { note: 'C4', element: document.querySelector('[data-key="a"]') },
+            's': { note: 'D4', element: document.querySelector('[data-key="s"]') },
+            'd': { note: 'E4', element: document.querySelector('[data-key="d"]') },
+            'f': { note: 'F4', element: document.querySelector('[data-key="f"]') },
+            'g': { note: 'G4', element: document.querySelector('[data-key="g"]') },
+            'h': { note: 'A4', element: document.querySelector('[data-key="h"]') },
+            'j': { note: 'B4', element: document.querySelector('[data-key="j"]') },
+
+            // C5 Octave
+            'k': { note: 'C5', element: document.querySelector('[data-key="k"]') },
+            'l': { note: 'D5', element: document.querySelector('[data-key="l"]') },
+            ';': { note: 'E5', element: document.querySelector('[data-key=";"]') },
+            "'": { note: 'F5', element: document.querySelector('[data-key="\'"]') },
+            '[': { note: 'G5', element: document.querySelector('[data-key="["]') },
+            ']': { note: 'A5', element: document.querySelector('[data-key="]"]') },
+            '\\': { note: 'B5', element: document.querySelector('[data-key="\\"]') },
+            'enter': { note: 'C6', element: document.querySelector('[data-key="enter"]') },
+
+            // Black Keys (C3 Octave)
+            'sft-z': { note: 'C#3', element: document.querySelector('[data-key="sft-z"]') },
+            'sft-x': { note: 'D#3', element: document.querySelector('[data-key="sft-x"]') },
+            'sft-v': { note: 'F#3', element: document.querySelector('[data-key="sft-v"]') },
+            'sft-b': { note: 'G#3', element: document.querySelector('[data-key="sft-b"]') },
+            'sft-n': { note: 'A#3', element: document.querySelector('[data-key="sft-n"]') },
+
+            // Black Keys (C4 Octave)
+            'w': { note: 'C#4', element: document.querySelector('[data-key="w"]') },
+            'e': { note: 'D#4', element: document.querySelector('[data-key="e"]') },
+            't': { note: 'F#4', element: document.querySelector('[data-key="t"]') },
+            'y': { note: 'G#4', element: document.querySelector('[data-key="y"]') },
+            'u': { note: 'A#4', element: document.querySelector('[data-key="u"]') },
+
+            // Black Keys (C5 Octave)
+            'o': { note: 'C#5', element: document.querySelector('[data-key="o"]') },
+            'p': { note: 'D#5', element: document.querySelector('[data-key="p"]') },
+            '[sft-\'': { note: 'F#5', element: document.querySelector('[data-key="[sft-\'"]') },
+            '{sft-[': { note: 'G#5', element: document.querySelector('[data-key="{sft-["]') },
+            '{sft-]': { note: 'A#5', element: document.querySelector('[data-key="{sft-]"]') }
+        };
+
+        const pressedKeys = new Set();
+
+        function playNote(note, keyElement) {
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            synth.triggerAttack(note);
+            if (keyElement) {
+                keyElement.classList.add('active');
+            }
+        }
+
+        function releaseNote(note, keyElement) {
+            synth.triggerRelease(note);
+            if (keyElement) {
+                keyElement.classList.remove('active');
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const keyChar = e.key.toLowerCase();
+            let mappedKey = keyChar;
+
+            if (e.shiftKey) {
+                if (keyChar === 'z') mappedKey = 'sft-z';
+                else if (keyChar === 'x') mappedKey = 'sft-x';
+                else if (keyChar === 'v') mappedKey = 'sft-v';
+                else if (keyChar === 'b') mappedKey = 'sft-b';
+                else if (keyChar === 'n') mappedKey = 'sft-n';
+                else if (keyChar === "'") mappedKey = "[sft-'";
+                else if (keyChar === '[') mappedKey = "{sft-[";
+                else if (keyChar === ']') mappedKey = "{sft-]";
+            } else if (keyChar === 'enter') {
+                mappedKey = 'enter';
+            }
+
+            if (keyMap[mappedKey] && !pressedKeys.has(mappedKey)) {
+                e.preventDefault();
+                playNote(keyMap[mappedKey].note, keyMap[mappedKey].element);
+                pressedKeys.add(mappedKey);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const keyChar = e.key.toLowerCase();
+            let mappedKey = keyChar;
+
+            if (e.shiftKey) {
+                if (keyChar === 'z') mappedKey = 'sft-z';
+                else if (keyChar === 'x') mappedKey = 'sft-x';
+                else if (keyChar === 'v') mappedKey = 'sft-v';
+                else if (keyChar === 'b') mappedKey = 'sft-b';
+                else if (keyChar === 'n') mappedKey = 'sft-n';
+                else if (keyChar === "'") mappedKey = "[sft-'";
+                else if (keyChar === '[') mappedKey = "{sft-[";
+                else if (keyChar === ']') mappedKey = "{sft-]";
+            } else if (keyChar === 'enter') {
+                mappedKey = 'enter';
+            }
+
+            if (keyMap[mappedKey] && pressedKeys.has(mappedKey)) {
+                releaseNote(keyMap[mappedKey].note, keyMap[mappedKey].element);
+                pressedKeys.delete(mappedKey);
+            }
+        });
+
+        const pianoKeys = document.querySelectorAll('.key');
+
+        pianoKeys.forEach(keyElement => {
+            const note = keyElement.dataset.note;
+
+            keyElement.addEventListener('mousedown', () => {
+                playNote(note, keyElement);
+            });
+            keyElement.addEventListener('mouseup', () => {
+                releaseNote(note, keyElement);
+            });
+            keyElement.addEventListener('mouseleave', () => {
+                if (keyElement.classList.contains('active')) {
+                    releaseNote(note, keyElement);
+                }
+            });
+
+            keyElement.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                playNote(note, keyElement);
+            }, { passive: false });
+
+            keyElement.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                releaseNote(note, keyElement);
+            });
+            keyElement.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                releaseNote(note, keyElement);
+            });
+        });
+
+        window.addEventListener('load', () => {
+            // Tone.start() is handled within playNote for user interaction policy
+        });
+    </script>
+</body>
+</html>
